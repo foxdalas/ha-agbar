@@ -1,0 +1,25 @@
+{
+  "entity": {
+    "sensor": {
+      "meter_reading": { "default": "mdi:gauge" },
+      "daily_consumption": { "default": "mdi:water" },
+      "month_to_date": { "default": "mdi:calendar-month" },
+      "avg_daily": { "default": "mdi:chart-line" },
+      "max_day": { "default": "mdi:chart-bar" },
+      "max_flow": { "default": "mdi:water-pump" },
+      "days_since_reading": { "default": "mdi:calendar-clock" },
+      "water_price": { "default": "mdi:cash" },
+      "last_invoice": { "default": "mdi:receipt-text" },
+      "debt": { "default": "mdi:cash-remove" }
+    },
+    "binary_sensor": {
+      "water_leak": {
+        "default": "mdi:pipe-leak",
+        "state": {
+          "off": "mdi:pipe",
+          "on": "mdi:pipe-leak"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="drop" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5BC8FF"/>
+      <stop offset="1" stop-color="#0A84C2"/>
+    </linearGradient>
+  </defs>
+  <!-- water drop, sized to nearly fill the square (minimal vertical padding) -->
+  <path fill="url(#drop)"
+        d="M128 8C128 8 48 112 48 168a80 80 0 1 0 160 0C208 112 128 8 128 8Z"/>
+  <!-- inner shine, suggesting a meter dial -->
+  <path fill="#FFFFFF" opacity="0.85"
+        d="M94 150a34 34 0 0 0 34 34 10 10 0 0 1 0 20 54 54 0 0 1-54-54 10 10 0 0 1 20 0Z"/>
+</svg>
