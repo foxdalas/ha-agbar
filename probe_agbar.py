@@ -40,8 +40,24 @@ def scrape_p_auth(html: str) -> str | None:
     return m.group(1) if m else None
 
 
-def login(s: requests.Session, username: str, password: str) -> str:
-    """Log in via CustomLoginPortlet. Returns a fresh p_auth for resource calls."""
+_CONTRACT_RES = (
+    re.compile(r"mis-contratos/-/detail/(\d+)"),
+    re.compile(r"/misfacturas/view/(\d+)/"),
+    re.compile(r'numeroContrato["\']?\s*[:=]\s*["\']?(\d{6,})'),
+)
+
+
+def extract_contract(html: str) -> str | None:
+    """Find the contract number on an authenticated page (cookie is unreliable)."""
+    for rx in _CONTRACT_RES:
+        m = rx.search(html or "")
+        if m:
+            return m.group(1)
+    return None
+
+
+def login(s: requests.Session, username: str, password: str):
+    """Log in via CustomLoginPortlet. Returns (p_auth, contract)."""
     # 1) GET the login page: sets WAF + session cookies, and gives us a p_auth.
     r = s.get(f"{BASE}/es/login")
     r.raise_for_status()
@@ -73,7 +89,7 @@ def login(s: requests.Session, username: str, password: str) -> str:
     home.raise_for_status()
     if not is_logged_in(home.text):
         raise RuntimeError("Login failed — check username/password (no session established)")
-    return scrape_p_auth(home.text)
+    return scrape_p_auth(home.text), extract_contract(home.text)
 
 
 def portlet_resource(s, page, portlet, op, p_auth, **params):
@@ -315,8 +331,10 @@ def main():
 
     s = new_session()
     print("Logging in…")
-    p_auth = login(s, username, password)
-    print(f"OK, logged in. p_auth for data calls = {p_auth}")
+    p_auth, contract = login(s, username, password)
+    cookie_contract = s.cookies.get("LR_LAST_CONTRACT")
+    print(f"OK, logged in. p_auth = {p_auth}")
+    print(f"contract: scraped={contract!r}  cookie={cookie_contract!r}")
 
     if "--depth" in sys.argv:
         # How far back does the daily telemetry really go? Probe a 5-year window.
@@ -341,7 +359,7 @@ def main():
     caudales = fetch_caudales(s, p_auth, "16/03/2026", "15/06/2026")
 
     s.get(f"{BASE}/es/group/sgab/mis-facturas").raise_for_status()
-    facturas = fetch_facturas(s, p_auth, "12272427")
+    facturas = fetch_facturas(s, p_auth, contract or cookie_contract)
 
     print(f"\nconsumos: {len(consumos.get('consumos', []))} rows; "
           f"caudales: {len(caudales.get('caudales', []))}; "

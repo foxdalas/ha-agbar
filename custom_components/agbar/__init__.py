@@ -6,7 +6,7 @@ from homeassistant.const import CONF_PASSWORD, CONF_USERNAME, Platform
 from homeassistant.core import HomeAssistant
 
 from .api import AgbarApiClient
-from .const import DOMAIN, HISTORY_DAYS
+from .const import DOMAIN, HISTORY_DAYS, PAGE_SIZE
 from .coordinator import AgbarCoordinator
 
 PLATFORMS: list[Platform] = [Platform.SENSOR]
@@ -15,7 +15,10 @@ PLATFORMS: list[Platform] = [Platform.SENSOR]
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Agbar from a config entry."""
     client = AgbarApiClient(
-        entry.data[CONF_USERNAME], entry.data[CONF_PASSWORD], history_days=HISTORY_DAYS
+        entry.data[CONF_USERNAME],
+        entry.data[CONF_PASSWORD],
+        history_days=HISTORY_DAYS,
+        page_size=PAGE_SIZE,
     )
     coordinator = AgbarCoordinator(hass, client)
     await coordinator.async_config_entry_first_refresh()

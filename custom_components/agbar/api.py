@@ -70,6 +70,23 @@ def is_logged_in(html: str) -> bool:
     return bool(re.search(r'"signedIn"\s*:\s*true', html))
 
 
+_CONTRACT_RES = (
+    re.compile(r"mis-contratos/-/detail/(\d+)"),
+    re.compile(r"/misfacturas/view/(\d+)/"),
+    re.compile(r'numeroContrato["\']?\s*[:=]\s*["\']?(\d{6,})'),
+)
+
+
+def extract_contract(html: str) -> str | None:
+    """Find the contract number on an authenticated page (link/markup), since the
+    LR_LAST_CONTRACT cookie is not reliably set right after a fresh login."""
+    for rx in _CONTRACT_RES:
+        m = rx.search(html or "")
+        if m:
+            return m.group(1)
+    return None
+
+
 def summarize(raw: dict) -> dict:
     """Turn the raw API responses into the flat dict the sensors consume."""
     # --- consumption: cumulative meter reading + last daily delta ------------
@@ -118,10 +135,17 @@ def summarize(raw: dict) -> dict:
 class AgbarApiClient:
     """Logs in and fetches consumption + invoices from the Veolia portal."""
 
-    def __init__(self, username: str, password: str, history_days: int = 400) -> None:
+    def __init__(
+        self,
+        username: str,
+        password: str,
+        history_days: int = 400,
+        page_size: int = 100,
+    ) -> None:
         self._username = username
         self._password = password
         self._history_days = history_days
+        self._page_size = page_size
         self._session: requests.Session | None = None
         self._p_auth: str | None = None
         self.contract: str | None = None
@@ -174,7 +198,8 @@ class AgbarApiClient:
 
         self._session = s
         self._p_auth = self._scrape_p_auth(home.text)
-        self.contract = s.cookies.get("LR_LAST_CONTRACT")
+        # Prefer scraping the contract from the page; cookie is an unreliable fallback.
+        self.contract = extract_contract(home.text) or s.cookies.get("LR_LAST_CONTRACT")
         return self
 
     def _resource(self, page: str, portlet: str, op: str, **params) -> dict:
@@ -213,6 +238,26 @@ class AgbarApiClient:
                 f"{op}: non-JSON response (len={len(r.text)}); session may have expired"
             ) from err
 
+    def _resource_all_pages(
+        self, page: str, portlet: str, op: str, key: str, *, fecha_inicio: str,
+        fecha_fin: str, max_rows: int = 5000,
+    ) -> dict:
+        """Paginate a resource op until ultimaPagina (the server caps pages at
+        ~100 rows regardless of ``fin``). ``key`` is the list field name."""
+        rows: list[dict] = []
+        inicio = 0
+        while len(rows) < max_rows:
+            resp = self._resource(
+                page, portlet, op, fechaInicio=fecha_inicio, fechaFin=fecha_fin,
+                inicio=str(inicio), fin=str(inicio + self._page_size - 1),
+            )
+            batch = resp.get(key, [])
+            rows.extend(batch)
+            if resp.get("ultimaPagina") or not batch:
+                break
+            inicio += self._page_size
+        return {key: rows, "ultimaPagina": True}
+
     def _warm_up(self, page: str) -> None:
         """Load a page's render phase so its portlet selects the contract in
         the session before we hit its (contract-less) resource endpoints."""
@@ -227,13 +272,14 @@ class AgbarApiClient:
         end = today.strftime("%d/%m/%Y")
 
         self._warm_up("mis-consumos")
-        consumos = self._resource(
-            "mis-consumos", "MisConsumos", "buscarConsumosDiaria",
-            fechaInicio=start, fechaFin=end, inicio="0", fin=str(self._history_days),
+        consumos = self._resource_all_pages(
+            "mis-consumos", "MisConsumos", "buscarConsumosDiaria", "consumos",
+            fecha_inicio=start, fecha_fin=end,
         )
+        # We only need the most recent day's flow, so one page (newest-first) is enough.
         caudales = self._resource(
             "mis-consumos", "MisConsumos", "buscarCaudales",
-            fechaInicio=start, fechaFin=end, inicio="0", fin=str(self._history_days),
+            fechaInicio=start, fechaFin=end, inicio="0", fin="30",
         )
 
         facturas = {"facturas": []}

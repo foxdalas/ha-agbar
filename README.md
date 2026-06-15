@@ -21,7 +21,9 @@ a Liferay portal) into Home Assistant, including history backfill for the
 | Outstanding debt | € | Sum of invoices not marked `PAGADA`; unpaid count as attribute |
 | Max daily flow | m³/h | Diagnostic, from the telemetry caudales feed |
 
-Telemetry lags ~1 day, so the integration polls every 4 hours.
+Telemetry lags ~1 day, so the integration polls every 4 hours. The portal only
+retains ~3–4 months of daily history, so the Energy Dashboard backfill goes back
+about that far (and rolls forward over time) — there is no deeper data to fetch.
 
 ## Installation
 
