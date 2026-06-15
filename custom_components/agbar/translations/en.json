@@ -31,9 +31,17 @@
     "sensor": {
       "meter_reading": { "name": "Meter reading" },
       "daily_consumption": { "name": "Daily consumption" },
+      "month_to_date": { "name": "Consumption this month" },
+      "avg_daily": { "name": "Average daily consumption" },
+      "max_day": { "name": "Highest daily consumption" },
+      "max_flow": { "name": "Max daily flow" },
+      "days_since_reading": { "name": "Days since last reading" },
+      "water_price": { "name": "Water price" },
       "last_invoice": { "name": "Last invoice" },
-      "debt": { "name": "Outstanding debt" },
-      "max_flow": { "name": "Max daily flow" }
+      "debt": { "name": "Outstanding debt" }
+    },
+    "binary_sensor": {
+      "water_leak": { "name": "Water leak alarm" }
     }
   }
 }

@@ -17,9 +17,22 @@ a Liferay portal) into Home Assistant, including history backfill for the
 |---|---|---|
 | Meter reading | m³ | Cumulative reading; also imported as long-term statistics (Energy Dashboard) |
 | Daily consumption | m³ | Most recent day's usage |
+| Consumption this month | m³ | Month-to-date total |
+| Average daily consumption | m³ | Diagnostic, last 30 days |
+| Highest daily consumption | m³ | Diagnostic |
+| Max daily flow | m³/h | Diagnostic, from the telemetry caudales feed |
+| Days since last reading | d | Diagnostic, data freshness |
+| Water price | €/m³ | Effective rate of the **last closed bill** (reference, not a forecast) |
 | Last invoice | € | Amount, with payment status & issue date as attributes |
 | Outstanding debt | € | Sum of invoices not marked `PAGADA`; unpaid count as attribute |
-| Max daily flow | m³/h | Diagnostic, from the telemetry caudales feed |
+| **Water leak alarm** | binary | On when the portal reports an active `WATER LEAK` alarm |
+
+Two long-term statistics are also imported for the Energy Dashboard:
+`agbar:water_<contract>` (consumption, m³) and `agbar:water_cost_<contract>`
+(cost, €). The cost is distributed from your issued invoices — variable charges
+in proportion to daily usage, fixed charges evenly — so each period sums to the
+real bill (the progressive Catalan *Canon de l'aigua* is already baked into that
+total, so no tariff reconstruction is needed).
 
 Telemetry lags ~1 day, so the integration polls every 4 hours. The portal only
 retains ~3–4 months of daily history, so the Energy Dashboard backfill goes back
@@ -55,7 +68,9 @@ Then add the integration and enter your `agbar.veolia.cat` email/username and pa
 ### Energy Dashboard
 
 After the first refresh, open the Energy configuration and, under **Water consumption**,
-add the statistic `Agbar water <contract>` (`agbar:water_<contract>`):
+add the statistic `Agbar water <contract>` (`agbar:water_<contract>`). To also track
+spend, set its cost to **"Use an entity tracking the total costs"** and pick
+`Agbar water cost <contract>` (`agbar:water_cost_<contract>`):
 
 [![Open your Home Assistant instance and show your energy configuration panel.](https://my.home-assistant.io/badges/config_energy.svg)](https://my.home-assistant.io/redirect/config_energy/)
 

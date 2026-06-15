@@ -11,17 +11,17 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CURRENCY_EURO, EntityCategory, UnitOfVolume
+from homeassistant.const import CURRENCY_EURO, EntityCategory, UnitOfTime, UnitOfVolume
 from homeassistant.core import HomeAssistant
-from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
-from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
-from .const import DOMAIN, MANUFACTURER
+from .const import DOMAIN
 from .coordinator import AgbarCoordinator
+from .entity import AgbarEntity
 
 VOLUME_FLOW_M3H = "m³/h"
+PRICE_EUR_M3 = f"{CURRENCY_EURO}/m³"
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -55,6 +55,57 @@ SENSORS: tuple[AgbarSensorDescription, ...] = (
         attrs_fn=lambda d: {"reading_date": d.get("last_reading_date")},
     ),
     AgbarSensorDescription(
+        key="month_to_date",
+        translation_key="month_to_date",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        value_fn=lambda d: d.get("month_to_date_m3"),
+    ),
+    AgbarSensorDescription(
+        key="avg_daily",
+        translation_key="avg_daily",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: d.get("avg_daily_m3"),
+    ),
+    AgbarSensorDescription(
+        key="max_day",
+        translation_key="max_day",
+        state_class=SensorStateClass.MEASUREMENT,
+        native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: d.get("max_day_m3"),
+    ),
+    AgbarSensorDescription(
+        key="max_flow",
+        translation_key="max_flow",
+        native_unit_of_measurement=VOLUME_FLOW_M3H,
+        state_class=SensorStateClass.MEASUREMENT,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: d.get("max_flow_m3h"),
+        attrs_fn=lambda d: {"date": d.get("max_flow_date")},
+    ),
+    AgbarSensorDescription(
+        key="days_since_reading",
+        translation_key="days_since_reading",
+        device_class=SensorDeviceClass.DURATION,
+        native_unit_of_measurement=UnitOfTime.DAYS,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda d: d.get("days_since_reading"),
+    ),
+    AgbarSensorDescription(
+        key="water_price",
+        translation_key="water_price",
+        native_unit_of_measurement=PRICE_EUR_M3,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda d: d.get("price_eur_m3"),
+        attrs_fn=lambda d: {
+            "based_on_period": d.get("price_period"),
+            "note": "effective rate of the last closed bill, not a forecast",
+        },
+    ),
+    AgbarSensorDescription(
         key="last_invoice",
         translation_key="last_invoice",
         device_class=SensorDeviceClass.MONETARY,
@@ -73,15 +124,6 @@ SENSORS: tuple[AgbarSensorDescription, ...] = (
         value_fn=lambda d: d.get("debt_eur"),
         attrs_fn=lambda d: {"unpaid_count": d.get("unpaid_count")},
     ),
-    AgbarSensorDescription(
-        key="max_flow",
-        translation_key="max_flow",
-        native_unit_of_measurement=VOLUME_FLOW_M3H,
-        state_class=SensorStateClass.MEASUREMENT,
-        entity_category=EntityCategory.DIAGNOSTIC,
-        value_fn=lambda d: d.get("max_flow_m3h"),
-        attrs_fn=lambda d: {"date": d.get("max_flow_date")},
-    ),
 )
 
 
@@ -97,11 +139,10 @@ async def async_setup_entry(
     )
 
 
-class AgbarSensor(CoordinatorEntity[AgbarCoordinator], SensorEntity):
+class AgbarSensor(AgbarEntity, SensorEntity):
     """A single Agbar value backed by the coordinator."""
 
     entity_description: AgbarSensorDescription
-    _attr_has_entity_name = True
 
     def __init__(
         self,
@@ -109,16 +150,9 @@ class AgbarSensor(CoordinatorEntity[AgbarCoordinator], SensorEntity):
         entry: ConfigEntry,
         description: AgbarSensorDescription,
     ) -> None:
-        super().__init__(coordinator)
+        super().__init__(coordinator, entry)
         self.entity_description = description
-        contract = coordinator.data.get("contract") or entry.entry_id
-        self._attr_unique_id = f"{contract}_{description.key}"
-        self._attr_device_info = DeviceInfo(
-            identifiers={(DOMAIN, contract)},
-            name=f"Agbar {contract}",
-            manufacturer=MANUFACTURER,
-            model="Water meter",
-        )
+        self._attr_unique_id = f"{self._contract}_{description.key}"
 
     @property
     def native_value(self) -> StateType:

@@ -6,13 +6,21 @@ from datetime import date, datetime, timedelta
 
 from homeassistant.components.recorder.models import StatisticData, StatisticMetaData
 from homeassistant.components.recorder.statistics import async_add_external_statistics
-from homeassistant.const import UnitOfVolume
+from homeassistant.const import CURRENCY_EURO, UnitOfVolume
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 import homeassistant.util.dt as dt_util
 
-from .api import AgbarApiClient, AgbarAuthError, AgbarError, es_date, es_float, summarize
+from .api import (
+    AgbarApiClient,
+    AgbarAuthError,
+    AgbarError,
+    cost_per_day,
+    es_date,
+    es_float,
+    summarize,
+)
 from .const import DOMAIN, SCAN_INTERVAL_HOURS
 
 _LOGGER = logging.getLogger(__name__)
@@ -41,6 +49,7 @@ class AgbarCoordinator(DataUpdateCoordinator[dict]):
 
         data = summarize(raw)
         self._import_statistics(raw, data.get("contract"))
+        self._import_cost_statistics(raw, data.get("contract"))
         return data
 
     def _import_statistics(self, raw: dict, contract: str | None) -> None:
@@ -75,5 +84,32 @@ class AgbarCoordinator(DataUpdateCoordinator[dict]):
             source=DOMAIN,
             statistic_id=f"{DOMAIN}:water_{contract}",
             unit_of_measurement=UnitOfVolume.CUBIC_METERS,
+        )
+        async_add_external_statistics(self.hass, metadata, stats)
+
+    def _import_cost_statistics(self, raw: dict, contract: str | None) -> None:
+        """Push daily water cost (€) into HA statistics, distributed from issued
+        invoices (variable ∝ usage, fixed evenly). Each period sums to its bill,
+        so this matches your real invoices. Attach it in the Energy Dashboard
+        water section as the entity tracking total costs.
+        """
+        costs = cost_per_day(raw)
+        if not costs or not contract:
+            return
+
+        running = 0.0
+        stats: list[StatisticData] = []
+        for d in sorted(costs):
+            running += costs[d]
+            start = dt_util.start_of_local_day(datetime(d.year, d.month, d.day))
+            stats.append(StatisticData(start=start, state=round(running, 2), sum=round(running, 2)))
+
+        metadata = StatisticMetaData(
+            has_mean=False,
+            has_sum=True,
+            name=f"Agbar water cost {contract}",
+            source=DOMAIN,
+            statistic_id=f"{DOMAIN}:water_cost_{contract}",
+            unit_of_measurement=CURRENCY_EURO,
         )
         async_add_external_statistics(self.hass, metadata, stats)

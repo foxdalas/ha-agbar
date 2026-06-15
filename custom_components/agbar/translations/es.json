@@ -31,9 +31,17 @@
     "sensor": {
       "meter_reading": { "name": "Lectura del contador" },
       "daily_consumption": { "name": "Consumo diario" },
+      "month_to_date": { "name": "Consumo este mes" },
+      "avg_daily": { "name": "Consumo medio diario" },
+      "max_day": { "name": "Consumo diario máximo" },
+      "max_flow": { "name": "Caudal máximo diario" },
+      "days_since_reading": { "name": "Días desde la última lectura" },
+      "water_price": { "name": "Precio del agua" },
       "last_invoice": { "name": "Última factura" },
-      "debt": { "name": "Deuda pendiente" },
-      "max_flow": { "name": "Caudal máximo diario" }
+      "debt": { "name": "Deuda pendiente" }
+    },
+    "binary_sensor": {
+      "water_leak": { "name": "Alarma de fuga de agua" }
     }
   }
 }

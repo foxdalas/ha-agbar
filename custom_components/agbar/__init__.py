@@ -9,7 +9,7 @@ from .api import AgbarApiClient
 from .const import DOMAIN, HISTORY_DAYS, PAGE_SIZE
 from .coordinator import AgbarCoordinator
 
-PLATFORMS: list[Platform] = [Platform.SENSOR]
+PLATFORMS: list[Platform] = [Platform.SENSOR, Platform.BINARY_SENSOR]
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:

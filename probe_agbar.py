@@ -175,6 +175,36 @@ def fetch_facturas(s, p_auth, numero_contrato, fin=11):
     )
 
 
+def fetch_contratos(s, p_auth):
+    return portlet_resource(
+        s, "mis-contratos", "ContractDetails", "loadContratos", p_auth,
+        offset="0", limit="10",
+    )
+
+
+def fetch_factura_datos(s, p_auth, contrato, factura, estado="3"):
+    return portlet_resource(
+        s, "mis-facturas", "MisFacturas", "get-datos-factura", p_auth,
+        numeroContrato=contrato, numeroFactura=factura, view="factura",
+        estado=estado, redsys="R0", payment="redsys",
+    )
+
+
+def fetch_factura_desglose(s, p_auth, contrato, factura, estado="3"):
+    return portlet_resource(
+        s, "mis-facturas", "MisFacturas", "get-desglose-factura", p_auth,
+        numeroContrato=contrato, numeroFactura=factura, view="factura",
+        estado=estado, redsys="R0", payment="redsys",
+    )
+
+
+def fetch_alarmas(s, p_auth):
+    return portlet_resource(
+        s, "mis-consumos", "alertas_consumo_settings_portlet",
+        "buscarUltimasAlarmas", p_auth,
+    )
+
+
 def es_float(text: str) -> float:
     """Spanish number -> float.  '1.234,56 €' -> 1234.56 ; '2031,991' -> 2031.991
 
@@ -184,11 +214,34 @@ def es_float(text: str) -> float:
     return float(cleaned.replace(".", "").replace(",", "."))
 
 
+def desglose_split(components: list) -> tuple[float, float, float]:
+    """From a get-desglose-factura array, return (total, variable, fixed).
+
+    variable = sum of all CONSUMO subconceptos (scale with m³, incl. Canon);
+    fixed    = everything else (CUOTA, meter upkeep, IVA) = total - variable.
+    """
+    total = sum(num(c.get("importe", 0)) for c in components)
+    variable = 0.0
+    for comp in components:
+        for sub in comp.get("subconceptos", []):
+            if sub.get("concepto", "").upper() == "CONSUMO":
+                variable += num(sub.get("importe", 0))
+    return round(total, 2), round(variable, 2), round(total - variable, 2)
+
+
 # Spanish month abbreviations as they appear in the portal ("14 jun 2026").
 ES_MONTHS = {
     "ene": 1, "feb": 2, "mar": 3, "abr": 4, "may": 5, "jun": 6,
     "jul": 7, "ago": 8, "sep": 9, "set": 9, "oct": 10, "nov": 11, "dic": 12,
 }
+
+
+def num(value) -> float:
+    """Dot-decimal number (JSON factura/contract endpoints) -> float.
+    These use '.' as the decimal point, UNLIKE the comma-format list endpoints."""
+    if isinstance(value, (int, float)):
+        return float(value)
+    return float(re.sub(r"[^0-9.\-]", "", str(value)) or "0")
 
 
 def es_date(text: str) -> date:
@@ -350,6 +403,89 @@ def main():
             print(f"  newest date      : {dates[-1]}")
             print(f"  oldest date      : {dates[0]}")
             print(f"  span             : {(dates[-1] - dates[0]).days} days")
+        return
+
+    if "--full" in sys.argv:
+        # Validate the cost/leak/metadata features against live data.
+        far = (date.today() - timedelta(days=400)).strftime("%d/%m/%Y")
+        today = date.today().strftime("%d/%m/%Y")
+        s.get(f"{BASE}/es/group/sgab/mis-consumos").raise_for_status()
+        consumos_rows, _, _ = fetch_consumos_all(s, p_auth, far, today)
+        alarmas = fetch_alarmas(s, p_auth)
+        contratos = fetch_contratos(s, p_auth)
+        s.get(f"{BASE}/es/group/sgab/mis-facturas").raise_for_status()
+        facturas = fetch_facturas(s, p_auth, contract).get("facturas", [])
+
+        # daily consumption keyed by date
+        daily = {}
+        for r in consumos_rows:
+            d = es_date(r.get("fechaConsumo", ""))
+            if d != date.min:
+                daily[d] = es_float(r["consumo"])
+
+        print("\n=== METADATA ===")
+        c0 = (contratos.get("contractToShow") or [{}])[0]
+        print(f"  address       : {c0.get('supplyAddress')}")
+        print(f"  smartMetering : {c0.get('smartMetering')}   flatRate: {c0.get('flatRate')}")
+        print(f"  owner         : {c0.get('fullName')}")
+        if facturas:
+            datos = fetch_factura_datos(
+                s, p_auth, contract, facturas[0]["numeroFactura"],
+                facturas[0].get("estadoNum", "3"),
+            )
+            print(f"  meter serial  : {datos.get('numeroContador')}")
+
+        print("\n=== LEAK ALARMS ===")
+        alist = (alarmas.get("data") or {}).get("alertasList", [])
+        active = [a for a in alist if a.get("active")]
+        print(f"  total={len(alist)}  active={len(active)}")
+        for a in alist[:3]:
+            print(f"   - {a.get('type')} active={a.get('active')} "
+                  f"days={a.get('daysActive')} start={a.get('startDate')}")
+
+        print("\n=== COST PER INVOICE (desglose split + daily distribution) ===")
+        for inv in facturas:
+            fac = inv["numeroFactura"]
+            comps = fetch_factura_desglose(s, p_auth, contract, fac, inv.get("estadoNum", "3"))
+            total, var, fixed = desglose_split(comps)
+            di, df = es_date(inv["fechaInicio"]), es_date(inv["fechaFin"])
+            days = (df - di).days + 1 if di != date.min and df != date.min else 0
+            in_period = {d: c for d, c in daily.items() if di <= d <= df}
+            period_m3 = round(sum(in_period.values()), 3)
+            eff = round(total / period_m3, 4) if period_m3 else None
+            print(f"  {fac}  {inv['fechaInicio']}–{inv['fechaFin']}")
+            print(f"      total={total}  variable={var}  fixed={fixed}")
+            print(f"      period_days={days}  covered_days={len(in_period)}  "
+                  f"period_m3={period_m3}  eff_€/m³={eff}")
+        return
+
+    if "--pdf" in sys.argv:
+        # Download the most recent invoice PDF so we can inspect whether it
+        # contains billed m³ + the canon tramo breakdown.
+        s.get(f"{BASE}/es/group/sgab/mis-facturas").raise_for_status()
+        facturas = fetch_facturas(s, p_auth, contract).get("facturas", [])
+        if not facturas:
+            sys.exit("No invoices found.")
+        inv = facturas[0]
+        fac = inv["numeroFactura"]
+        qs = {
+            "p_p_id": "MisFacturas", "p_p_lifecycle": "2", "p_p_state": "normal",
+            "p_p_mode": "view", "p_p_cacheability": "cacheLevelPage", "p_auth": p_auth,
+            "_MisFacturas_op": "descargarFacturaPdf",
+            "_MisFacturas_idDocFactura": f"id_{fac}",
+            "_MisFacturas_view": "factura",
+            "_MisFacturas_estado": inv.get("estadoNum", "3"),
+            "_MisFacturas_numeroContrato": contract,
+            "_MisFacturas_numeroFactura": fac,
+            "_MisFacturas_redsys": "R0", "_MisFacturas_payment": "redsys",
+        }
+        page_url = f"{BASE}/es/group/sgab/mis-facturas"
+        r = s.get(page_url, params=qs, headers={"Referer": page_url})
+        r.raise_for_status()
+        with open("factura.pdf", "wb") as fh:
+            fh.write(r.content)
+        print(f"saved factura.pdf  invoice={fac}  bytes={len(r.content)}  "
+              f"content-type={r.headers.get('content-type')}")
         return
 
     # Warm up the render phase so each portlet establishes its selected-contract
