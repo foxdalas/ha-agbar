@@ -1,0 +1,12 @@
+{
+  "domain": "agbar",
+  "name": "Agbar (Veolia) Water",
+  "codeowners": ["@foxdalas"],
+  "config_flow": true,
+  "documentation": "https://github.com/foxdalas/ha_agbar",
+  "integration_type": "hub",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/foxdalas/ha_agbar/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

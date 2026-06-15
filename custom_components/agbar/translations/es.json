@@ -1,0 +1,39 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Agbar (Veolia) Agua",
+        "description": "Introduce tus credenciales del área de clientes de agbar.veolia.cat.",
+        "data": {
+          "username": "Email o usuario",
+          "password": "Contraseña"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Volver a autenticar Agbar",
+        "description": "La sesión de {username} ha caducado. Introduce de nuevo la contraseña.",
+        "data": {
+          "password": "Contraseña"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Usuario o contraseña no válidos.",
+      "cannot_connect": "No se pudo conectar con el portal de Agbar.",
+      "unknown": "Error inesperado."
+    },
+    "abort": {
+      "already_configured": "Esta cuenta ya está configurada.",
+      "reauth_successful": "La reautenticación se completó correctamente."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "meter_reading": { "name": "Lectura del contador" },
+      "daily_consumption": { "name": "Consumo diario" },
+      "last_invoice": { "name": "Última factura" },
+      "debt": { "name": "Deuda pendiente" },
+      "max_flow": { "name": "Caudal máximo diario" }
+    }
+  }
+}

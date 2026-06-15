@@ -1,0 +1,39 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Agbar (Veolia) Water",
+        "description": "Enter your agbar.veolia.cat customer area credentials.",
+        "data": {
+          "username": "Email or username",
+          "password": "Password"
+        }
+      },
+      "reauth_confirm": {
+        "title": "Re-authenticate Agbar",
+        "description": "The session for {username} expired. Enter the password again.",
+        "data": {
+          "password": "Password"
+        }
+      }
+    },
+    "error": {
+      "invalid_auth": "Invalid username or password.",
+      "cannot_connect": "Failed to connect to the Agbar portal.",
+      "unknown": "Unexpected error."
+    },
+    "abort": {
+      "already_configured": "This account is already configured.",
+      "reauth_successful": "Re-authentication was successful."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "meter_reading": { "name": "Meter reading" },
+      "daily_consumption": { "name": "Daily consumption" },
+      "last_invoice": { "name": "Last invoice" },
+      "debt": { "name": "Outstanding debt" },
+      "max_flow": { "name": "Max daily flow" }
+    }
+  }
+}
