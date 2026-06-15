@@ -11,7 +11,13 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.config_entries import ConfigEntry
-from homeassistant.const import CURRENCY_EURO, EntityCategory, UnitOfTime, UnitOfVolume
+from homeassistant.const import (
+    CURRENCY_EURO,
+    EntityCategory,
+    UnitOfTime,
+    UnitOfVolume,
+    UnitOfVolumeFlowRate,
+)
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddEntitiesCallback
 from homeassistant.helpers.typing import StateType
@@ -20,7 +26,6 @@ from .const import DOMAIN
 from .coordinator import AgbarCoordinator
 from .entity import AgbarEntity
 
-VOLUME_FLOW_M3H = "m³/h"
 PRICE_EUR_M3 = f"{CURRENCY_EURO}/m³"
 
 
@@ -80,7 +85,8 @@ SENSORS: tuple[AgbarSensorDescription, ...] = (
     AgbarSensorDescription(
         key="max_flow",
         translation_key="max_flow",
-        native_unit_of_measurement=VOLUME_FLOW_M3H,
+        device_class=SensorDeviceClass.VOLUME_FLOW_RATE,
+        native_unit_of_measurement=UnitOfVolumeFlowRate.CUBIC_METERS_PER_HOUR,
         state_class=SensorStateClass.MEASUREMENT,
         entity_category=EntityCategory.DIAGNOSTIC,
         value_fn=lambda d: d.get("max_flow_m3h"),
