@@ -53,7 +53,8 @@ SENSORS: tuple[AgbarSensorDescription, ...] = (
     AgbarSensorDescription(
         key="daily_consumption",
         translation_key="daily_consumption",
-        device_class=SensorDeviceClass.WATER,
+        # No device_class: WATER forbids the 'measurement' state class, and a
+        # day-over-day figure is a measurement (not a cumulative total).
         state_class=SensorStateClass.MEASUREMENT,
         native_unit_of_measurement=UnitOfVolume.CUBIC_METERS,
         value_fn=lambda d: d.get("last_daily_m3"),
